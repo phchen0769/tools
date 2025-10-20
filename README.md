@@ -1,9 +1,39 @@
-# yuejuan
+# tools
 创建一个web站点用于批改学生成绩。
 # 本地运行
 streamlit run auth.py
 # 指定端口运行
-streamlit run auth.py --server.port 8888
+streamlit run auth.py --server.port 8080
 
-# 注意：
-# 程序编写完成后，需要把docker-compose-win.yml以及Dockerfile拷贝到程序根目录（与auth.py同级目录）下，cmd cd到程序根目录，后执行 docker-compose -f docker-compose-win.yml up 生成并启动容器。
+
+# 文件重命名工具使用说明
+
+## 功能说明
+本工具用于将类似 `2506106_dengzhizhong_练习5_邓智中.xlsx` 格式的文件名重命名为 `练习5_邓智中.xlsx` 格式。
+
+
+## 使用方法
+
+### 1. 通过网页界面使用
+1. 运行应用: `streamlit run auth.py`
+2. 登录系统
+3. 在导航菜单中选择"文件重命名"选项
+4. 上传需要重命名的Excel文件
+5. 预览重命名结果
+6. 点击"执行重命名并下载文件"按钮
+7. 下载重命名后的文件
+
+### 2. 批量处理本地目录
+1. 将需要重命名的文件放入指定目录（默认为 `upload` 目录）
+2. 在网页界面中指定源目录和目标目录
+3. 点击"预览目录中的文件重命名"
+4. 确认无误后点击"执行目录重命名"
+
+## 文件命名规则
+- 输入文件格式: `学号_姓名_练习名_姓名.xlsx`
+- 输出文件格式: `练习名_姓名.xlsx`
+
+## 注意事项
+- 仅支持 .xlsx 和 .xls 格式的Excel文件
+- 重命名后的文件会保存在指定的目标目录中
+- 原始文件不会被修改，会生成新的重命名文件
