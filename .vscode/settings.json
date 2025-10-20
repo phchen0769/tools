@@ -1,0 +1,13 @@
+{
+	"python.defaultInterpreterPath": "/usr/local/bin/python",
+	"workbench.colorTheme": "Copilot Theme",
+	"editor.fontSize": 20,
+	"editor.formatOnType": true,
+	"[python]":{
+		"editor.defaultFormatter": "ms-python.black-formatter",
+	},
+	
+	"[json]": {
+		"editor.defaultFormatter": "ClemensPeters.format-json"
+	}
+}
