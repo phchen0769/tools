@@ -1,0 +1,11 @@
+version: "3.7"
+services:
+  streamlit:
+    build: ./
+    container_name: yuejuan_streamlit
+    ports:
+      - "8888:8888"
+    working_dir: "/workspaces/yuejuan_streamlit"
+    volumes:
+      - /Volumes/myDriver/Github/yuejuan_streamlit:/workspaces/yuejuan_streamlit
+    command: "streamlit run auth.py --server.port 8888"
