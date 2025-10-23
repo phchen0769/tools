@@ -70,18 +70,6 @@ def main():
     # 显示content页
     show_content(student_df)
 
-    # congtainer内容减少padding
-    st.markdown(
-        """<style>
-                        
-                        .block-container.st-emotion-cache-z5fcl4.ea3mdgi4{
-                            padding:10px;
-                        }
-                        
-                        </style>""",
-        unsafe_allow_html=True,
-    )
-
 
 if __name__ == "__main__":
     main()

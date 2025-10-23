@@ -10,7 +10,7 @@ from db_operator import out_sql
 
 # 初始化 站点显示参数
 st.set_page_config(
-    page_title="学生成绩批阅系统",
+    page_title="Tools",
     page_icon="🇨🇳",
     layout="wide",
     initial_sidebar_state="auto",
@@ -121,7 +121,12 @@ if st.session_state["authentication_status"]:
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
     # 在右侧显示主要内容
-    app = hy.HydraApp(title="阅卷系统")
+    app = hy.HydraApp(title="教学工具")
+    
+    # 添加文件重命名功能
+    @app.addapp()
+    def 文件重命名():
+        show_file_rename_page()
 
     @app.addapp()
     def 题目详情():
@@ -131,10 +136,7 @@ if st.session_state["authentication_status"]:
     def 成绩汇总():
         second_main()
 
-    # 添加文件重命名功能
-    @app.addapp()
-    def 文件重命名():
-        show_file_rename_page()
+    
 
     app.run()
 
@@ -143,29 +145,30 @@ elif st.session_state["authentication_status"] is False:
 elif st.session_state["authentication_status"] is None:
     st.warning("请输入你的用户名和密码。")
 
-st.markdown(
-    """
+# 添加统一的CSS样式来减少导航条上方的空白
+# st.markdown(
+#     """
                         
-                        #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4{
-                            padding:10px;
-                        }
-                        #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4 > div > div{
-                        padding:0;
-                        margin:0;
-                        width:80vw;
-                        }
-                        #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5{
-                        padding:0;
-                        margin:0;
-                        flex-direction: row;
-                        flex-wrap: wrap;
-                        width:100vw;
-                        }
+#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4{
+#                             padding:10px;
+#                         }
+#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4 > div > div{
+#                         padding:0;
+#                         margin:0;
+#                         width:80vw;
+#                         }
+#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5{
+#                         padding:0;
+#                         margin:0;
+#                         flex-direction: row;
+#                         flex-wrap: wrap;
+#                         width:100vw;
+#                         }
 
-                        #root > div:nth-child(1) > div.withScreencast > div > div > header > div.st-emotion-cache-zq5wmm.ezrtsby0 > div.stDeployButton > button{
-                        display:none;
-                        }
+#                         #root > div:nth-child(1) > div.withScreencast > div > div > header > div.st-emotion-cache-zq5wmm.ezrtsby0 > div.stDeployButton > button{
+#                         display:none;
+#                         }
 
-                        </style>""",
-    unsafe_allow_html=True,
-)
+#                         </style>""",
+#     unsafe_allow_html=True,
+# )

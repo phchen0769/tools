@@ -13,7 +13,7 @@
                 "run",
                 "auth.py",
                 "--server.port",
-                "8080"
+                "2345"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"

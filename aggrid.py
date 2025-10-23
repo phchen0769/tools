@@ -63,6 +63,8 @@ def aggrid_question(question_df):
         # 创建一个空容器，用于占位
         container = st.container()
         container.markdown("# 题目为空！")
+        # 返回一个空的字典结构，包含selected_rows键
+        return {"selected_rows": []}
     else:
         gd = GridOptionsBuilder.from_dataframe(question_df)
         # 打开ag-grid调试信息,选择后输出调试信息
@@ -155,6 +157,8 @@ def aggrid_student(student_df):
         # 创建一个空容器，用于占位
         container = st.container()
         container.markdown("# 学生为空！")
+        # 返回一个空的字典结构，包含selected_rows键
+        return {"selected_rows": []}
     else:
         gd = GridOptionsBuilder.from_dataframe(student_df)
         # 打开ag-grid调试信息,选择后输出调试信息
