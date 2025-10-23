@@ -1,0 +1,59 @@
+# Python临时文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 临时上传目录
+temp_uploads/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 编译文件
+*.class
+*.jar
+*.war
+*.ear
+
+# 包文件
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 测试文件
+.coverage
+.pytest_cache/
+htmlcov/
+
+# 环境变量文件
+.env
+.env.local
+.env.production
+
+# 项目特定忽略
+myDB.db
+tools.git/

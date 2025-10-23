@@ -10,32 +10,24 @@ def chinese_sort_key(filename):
     """
     为中文文件名生成排序键，按汉字字母顺序排序
     """
-    # 移除文件扩展名
+    # 移除文件扩展名，获取完整的文件名（不含扩展名）
     name_without_ext = os.path.splitext(filename)[0]
-
-    # 提取姓名部分（假设格式为"学号 姓名"）
-    # 使用空格分割，取最后一个部分作为姓名
-    parts = name_without_ext.split()
-    if len(parts) > 1:
-        # 如果有空格分割，取最后一个部分作为姓名
-        name_part = parts[-1]
-    else:
-        # 如果没有空格，使用整个文件名
-        name_part = name_without_ext
 
     # 将汉字转换为拼音进行排序
     try:
         # 尝试使用pypinyin库进行汉字转拼音
         from pypinyin import pinyin, Style
 
-        # 获取完整拼音字符串用于排序（按字母顺序）
-        full_pinyin_str = "".join(
-            [item[0] for item in pinyin(name_part, style=Style.NORMAL) if item]
-        )
-        return full_pinyin_str.lower()
+        # 获取每个汉字的拼音列表，用于逐个汉字比较
+        pinyin_list = []
+        for item in pinyin(name_without_ext, style=Style.NORMAL):
+            if item:
+                # 每个汉字对应一个拼音字符串
+                pinyin_list.append(item[0].lower())
+        return pinyin_list
     except ImportError:
         # 如果没有安装pypinyin，使用Unicode编码进行简单排序
-        return (name_part.lower(),)
+        return list(name_without_ext.lower())
 
 
 def extract_name_from_filename(
@@ -370,28 +362,24 @@ def show_file_rename_page():
     if uploaded_files:
         # 创建临时目录存储上传的文件
         temp_upload_dir = "temp_uploads"
-        temp_output_dir = "temp_outputs"
-
+        
         # 清理之前的临时目录
         if os.path.exists(temp_upload_dir):
             shutil.rmtree(temp_upload_dir)
-        if os.path.exists(temp_output_dir):
-            shutil.rmtree(temp_output_dir)
-
+        
         os.makedirs(temp_upload_dir, exist_ok=True)
-        os.makedirs(temp_output_dir, exist_ok=True)
-
+        
         # 保存上传的文件
         for uploaded_file in uploaded_files:
             file_path = os.path.join(temp_upload_dir, uploaded_file.name)
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-
-        # 预览重命名结果
+        
+        # 预览重命名结果 - 使用临时目录进行预览
         st.subheader("重命名预览")
         renamed_files = rename_files_in_directory(
             temp_upload_dir,
-            temp_output_dir,
+            temp_upload_dir,  # 使用同一个目录进行预览
             delimiter=delimiter,
             keep_parts=keep_parts,
             replacement_pattern=replacement_pattern,
@@ -399,47 +387,44 @@ def show_file_rename_page():
             rename_list=rename_list,
             preview_only=True,
         )
-
+        
         if renamed_files:
             # 显示预览表格（移除序号列，保留原始文件名、新文件名、状态）
             preview_data = []
             for i, (old_name, new_name) in enumerate(renamed_files):
                 status = "✅ 将被重命名" if old_name != new_name else "ℹ️ 无需更改"
-
+    
                 preview_data.append(
                     {"原始文件名": old_name, "新文件名": new_name, "状态": status}
                 )
-
+    
             st.table(preview_data)
-
+            
             # 执行重命名按钮
             if st.button("执行重命名并下载文件"):
-                # 实际执行重命名操作
-                actual_renamed_files = rename_files_in_directory(
-                    temp_upload_dir,
-                    temp_output_dir,
-                    delimiter=delimiter,
-                    keep_parts=keep_parts,
-                    replacement_pattern=replacement_pattern,
-                    custom_rule=custom_rule,
-                    rename_list=rename_list,
-                    preview_only=False,
-                )
-
-                # 创建下载链接
-                st.success(f"成功重命名 {len(actual_renamed_files)} 个文件！")
-
-                # 提供打包下载
+                # 直接在内存中处理文件，避免创建temp_outputs目录
                 import zipfile
                 from io import BytesIO
-
+                
+                # 创建ZIP文件缓冲区
                 zip_buffer = BytesIO()
+                
                 with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                    for _, new_name in actual_renamed_files:
-                        file_path = os.path.join(temp_output_dir, new_name)
-                        if os.path.exists(file_path):
-                            zip_file.write(file_path, new_name)
-
+                    for i, (old_name, new_name) in enumerate(renamed_files):
+                        old_path = os.path.join(temp_upload_dir, old_name)
+                        
+                        # 读取原始文件内容
+                        with open(old_path, "rb") as f:
+                            file_content = f.read()
+                        
+                        # 将重命名后的文件添加到ZIP
+                        zip_file.writestr(new_name, file_content)
+                    
+                # 重置缓冲区指针
+                zip_buffer.seek(0)
+                
+                st.success(f"成功重命名 {len(renamed_files)} 个文件！")
+            
                 # 下载按钮
                 st.download_button(
                     label="下载所有重命名后的文件 (ZIP)",
@@ -447,19 +432,23 @@ def show_file_rename_page():
                     file_name="重命名后的文件.zip",
                     mime="application/zip",
                 )
-
+            
                 # 单独下载每个文件
                 st.subheader("单独下载文件")
-                for i, (_, new_name) in enumerate(actual_renamed_files):
-                    file_path = os.path.join(temp_output_dir, new_name)
-                    if os.path.exists(file_path):
-                        with open(file_path, "rb") as file:
-                            st.download_button(
-                                label=f"下载 {new_name}",
-                                data=file,
-                                file_name=new_name,
-                                mime="application/octet-stream",
-                            )
+                for i, (old_name, new_name) in enumerate(renamed_files):
+                    old_path = os.path.join(temp_upload_dir, old_name)
+                    
+                    with open(old_path, "rb") as file:
+                        st.download_button(
+                            label=f"下载 {new_name}",
+                            data=file,
+                            file_name=new_name,
+                            mime="application/octet-stream",
+                        )
+            
+            # 清理临时目录
+            if os.path.exists(temp_upload_dir):
+                shutil.rmtree(temp_upload_dir)
         else:
             st.warning("没有找到有效的文件。")
 
