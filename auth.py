@@ -14,7 +14,7 @@ st.set_page_config(
     page_title="Tools",
     page_icon="🇨🇳",
     layout="wide",
-    initial_sidebar_state="collapsed",  # 改为collapsed以隐藏sidebar
+    initial_sidebar_state="expanded",  # 改为expanded以保持sidebar打开状态
     menu_items=None,
 )
 
@@ -73,9 +73,19 @@ if st.session_state["authentication_status"]:
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            .css-1d391kg {display: none;}  /* 隐藏sidebar */
+            /* 顶行工具栏*/
+            header, .stApp > header, .st-emotion-cache-18ni7ap ea3mdgi2 {
+                visibility: hidden;
+            }
+
+            /* 主页头部 */
+            .st-emotion-cache-z5fcl4{
+                padding: 1rem !important;
+                /* background-color: #ADD8E6 !important; */
+            }
             </style>
             """
+
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
     # 在顶部显示用户信息和退出按钮

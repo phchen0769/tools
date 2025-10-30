@@ -14,13 +14,13 @@ def show_file_upload_page():
     """
     显示文件上传页面
     """
-    st.title("📁 文件上传与管理")
 
     # 创建外部存储目录（如果不存在）
     os.makedirs(EXTERNAL_STORAGE_PATH, exist_ok=True)
 
     # 侧边栏：文件管理选项
-    st.sidebar.header("文件管理")
+    st.sidebar.header("📤 上传文件")
+
     management_option = st.sidebar.radio(
         "选择操作", ["上传文件", "查看文件", "删除文件"]
     )
@@ -155,7 +155,6 @@ def show_upload_section():
     """
     显示文件上传部分
     """
-    st.header("📤 上传文件")
 
     # 创建分类目录
     categories = ["文档", "图片", "Excel文件", "其他"]
