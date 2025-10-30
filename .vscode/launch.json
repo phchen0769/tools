@@ -8,12 +8,12 @@
             "name": "Python: Streamlit",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/vscode/.local/bin/streamlit",
+            "program": "/usr/local/bin/streamlit",
             "args": [
                 "run",
                 "auth.py",
                 "--server.port",
-                "2345"
+                "8888"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"

@@ -1,22 +1,24 @@
 import streamlit as st
 import pandas as pd
 
-from aggrid import aggrid_question
-from sidebar import show_sidebar
+from aggrid import aggrid_student
 from db_operator import (
     out_sql,
-    del_question_data,
+    del_student_data,
 )
 
 
 # 显示content内容
-def show_content(question_df):
+def show_content(student_df):
+    # 页面标题
+    st.subheader("📊 学生成绩汇总")
+
     # form控件，题目不为空，显示控件
-    if not question_df.empty:
+    if not student_df.empty:
         # form控件，表单
         with st.form("question_form"):
             # aggrid控件
-            grid_res = aggrid_question(question_df)
+            grid_res = aggrid_student(student_df)
             selection = grid_res["selected_rows"]
 
             # 设置按钮布局
@@ -30,47 +32,44 @@ def show_content(question_df):
             #             st.error("保存失败！")
             # with col2:
             # form_submit_btn控件，表单提交--删除被选中题目信息
-
-            if st.form_submit_button("删除题目", help="删除被选中题目,如果所有题目都没有被选中，则删除所有题目。"):
+            if st.form_submit_button(
+                "🗑️ 删除学生",
+                help="删除被选中学生,如果所有学生都没有被选中，则删除所有学生。",
+            ):
                 if len(selection):
                     for i in selection:
-                        del_question_data(i["id"])
-                    st.success("题目已删除！")
+                        del_student_data("Student", i["id"])
+                    st.success("✅ 学生已删除！")
                 else:
-                    if del_question_data(id=0):
-                        st.success("题目已清空！")
+                    if del_student_data(id=0):
+                        st.success("✅ 学生已清空！")
                     else:
-                        st.error("删除失败！")
+                        st.error("❌ 删除失败！")
 
     else:
-        st.error("题目为空！请先导入数据。")
+        st.error("❌ 学生为空！请先导入数据。")
 
-        # 导出当前数据
-
+    # 导出按钮，导出当前数据
     @st.cache_data
-    def convert_df(question_df):
-        return question_df.to_csv().encode("utf_8_sig")
+    def convert_df(student_df):
+        return student_df.to_csv().encode("utf_8_sig")
 
-    csv = convert_df(question_df)
+    csv = convert_df(student_df)
 
     st.download_button(
-        label="导出题目详情为excel",
+        label="📊 导出学生总分为CSV",
         data=csv,
-        file_name="题目详情.csv",
+        file_name="学生总分.csv",
         mime="text/csv",
     )
 
 
 def main():
-    # 从数据库获取，题目信息
-    question_df = out_sql("questions")
+    # 从数据库获取，学生信息
     student_df = out_sql("students")
 
-    # 显示siderbar页
-    show_sidebar(question_df, student_df)
-
     # 显示content页
-    show_content(question_df)
+    show_content(student_df)
 
 
 if __name__ == "__main__":

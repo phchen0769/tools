@@ -2,9 +2,10 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import hydralit as hy
 
-from frist_page import main as frist_main
-from second_page import main as second_main
-from file_renamer import show_file_rename_page  # 添加这一行
+from questions_page import main as frist_main
+from records_page import main as second_main
+from renamer_page import show_file_rename_page  # 添加这一行
+from uploader_page import show_file_upload_page  # 添加文件上传页面导入
 from db_operator import out_sql
 
 
@@ -13,7 +14,7 @@ st.set_page_config(
     page_title="Tools",
     page_icon="🇨🇳",
     layout="wide",
-    initial_sidebar_state="auto",
+    initial_sidebar_state="collapsed",  # 改为collapsed以隐藏sidebar
     menu_items=None,
 )
 
@@ -47,8 +48,8 @@ for user in user_df:
 cookie = {
     "expiry_days": 30,
     "key": "Fedorov is handsome man.",  # 必须是字符串
-    "name": "yuanjuan_cookie",
-    "preauthorized": {"emails": "phchen0769@gmail.com"},
+    "name": "tools_cookie",
+    "preauthorized": {"emails": "pwchan0769@icloud.com"},
 }
 
 # 实例化authenticator对象
@@ -67,62 +68,38 @@ name, authentication_status, username = authenticator.login("登录", "main")
 # 登录页面的注册按钮和重置密码按钮
 
 if st.session_state["authentication_status"]:
-    # 登录成功
-    with st.sidebar:
-        st.markdown("***")
-        # with cols1.container():
-        #     if st.button("注册"):
-        #         try:
-        #             if authenticator.register_user("注册", preauthorization=False):
-        #                 st.success("注册成功！")
-        #         except Exception as e:
-        #             st.error(e)
-
-        # with cols2.container():
-        #     if st.button("重置密码"):
-        #         # 重置密码
-        #         try:
-        #             if authenticator.reset_password(username, "重置密码"):
-        #                 st.success("密码重置成功！")
-        #         except Exception as e:
-        #             st.error(e)
-
-        # with cols3.container():
-        #     if st.button("更新个人信息"):
-        #         # 更新用户详细信息
-        #         try:
-        #             if authenticator.update_user_details(username, "更新个人信息"):
-        #                 st.success("个人信息更新成功。")
-        #         except Exception as e:
-        #             st.error(e)
-
-        # # 退出按钮
-        # with cols4.container():
-        #     # 退出登录
-        #     authenticator.logout("退出", "main", key="unique_key")
-
-        cols1, cols2 = st.columns(2)
-        cols1.markdown(f"欢迎{st.session_state['name']}")
-
-    # 退出按钮
-    with cols2.container():
-        # 退出登录
-        authenticator.logout("退出", "main", key="unique_key")
-
-    st.sidebar.markdown("***")
-
     # 隐藏made with streamlit
     hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            .css-1d391kg {display: none;}  /* 隐藏sidebar */
             </style>
             """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+    # 在顶部显示用户信息和退出按钮
+    col1, col2, col3 = st.columns([3, 1, 1])
+
+    with col1:
+        st.markdown(f"### 👋 欢迎，{st.session_state['name']}！")
+
+    with col3:
+        # 退出登录按钮
+        if st.button("🚪 退出登录"):
+            st.session_state["authentication_status"] = None
+            st.rerun()
+
+    st.markdown("---")
+
     # 在右侧显示主要内容
     app = hy.HydraApp(title="教学工具")
-    
+
+    # 添加文件上传功能
+    @app.addapp()
+    def 文件上传():
+        show_file_upload_page()
+
     # 添加文件重命名功能
     @app.addapp()
     def 文件重命名():
@@ -136,39 +113,9 @@ if st.session_state["authentication_status"]:
     def 成绩汇总():
         second_main()
 
-    
-
     app.run()
 
 elif st.session_state["authentication_status"] is False:
-    st.error("用户名或密码错误！")
+    st.error("❌ 用户名或密码错误！")
 elif st.session_state["authentication_status"] is None:
-    st.warning("请输入你的用户名和密码。")
-
-# 添加统一的CSS样式来减少导航条上方的空白
-# st.markdown(
-#     """
-                        
-#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4{
-#                             padding:10px;
-#                         }
-#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5 > div.block-container.st-emotion-cache-1y4p8pa.ea3mdgi4 > div > div{
-#                         padding:0;
-#                         margin:0;
-#                         width:80vw;
-#                         }
-#                         #root > div:nth-child(1) > div.withScreencast > div > div > div > section.main.st-emotion-cache-uf99v8.ea3mdgi5{
-#                         padding:0;
-#                         margin:0;
-#                         flex-direction: row;
-#                         flex-wrap: wrap;
-#                         width:100vw;
-#                         }
-
-#                         #root > div:nth-child(1) > div.withScreencast > div > div > header > div.st-emotion-cache-zq5wmm.ezrtsby0 > div.stDeployButton > button{
-#                         display:none;
-#                         }
-
-#                         </style>""",
-#     unsafe_allow_html=True,
-# )
+    st.warning("🔐 请输入你的用户名和密码。")
