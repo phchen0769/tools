@@ -153,20 +153,20 @@ def rename_files_in_directory(
     preview_only=True,
 ):
     """
-    重命名目录中的文件
+        重命名目录中的文件
 
-    Args:
-        source_dir: 源目录路径
-        target_dir: 目标目录路径
-        delimiter: 文件名分隔符
-        keep_parts: 保留的部分设置
-        replacement_pattern: 替换模式
-        custom_rule: 自定义重命名规则
-        rename_list: 重命名名称列表
-        preview_only: 是否仅预览而不实际重命名
+        Args:
+            source_dir: 源目录路径
+            target_dir: 目标目录路径
+            delimiter: 文件名分隔符
+            keep_parts: 保留的部分设置
+            replacement_pattern: 替换模式
+            custom_rule: 自定义重命名规则
+            rename_list: 重命名名称列表
+    preview_only: 是否仅预览而不实际重命名
 
-    Returns:
-        list: 包含原始文件名和新文件名的元组列表
+        Returns:
+            list: 包含原始文件名和新文件名的元组列表
     """
     renamed_files = []
 
@@ -251,12 +251,6 @@ def parse_rename_list(text):
 def show_file_rename_page():
     """显示文件重命名页面"""
     # 说明文字
-    st.info(
-        """
-    此工具可以根据自定义规则批量重命名文件。
-    支持的文件类型：Excel文件(.xlsx, .xls)、图片文件(.jpg, .jpeg, .png, .gif, .bmp)、Python源码(.py)等。
-    """
-    )
 
     # 侧边栏 - 重命名配置
     with st.sidebar:
@@ -385,22 +379,34 @@ def show_file_rename_page():
         available_dirs = sorted(available_dirs)
 
     # 添加根目录选项
-    available_dirs.insert(0, "根目录 (/external_storage)")
+    available_dirs.insert(0, "根目录")
 
     # 选择目录
     selected_dir_option = st.selectbox(
         "请选择要处理的目录:",
         options=available_dirs,
         help="选择包含需要重命名文件的目录",
+        # 使用session_state存储选择的目录，以便检测变化
+        key="directory_selector",
     )
 
     # 确定实际路径
-    if selected_dir_option == "根目录 (/external_storage)":
+    if selected_dir_option == "根目录":
         local_folder_path = EXTERNAL_STORAGE_PATH
     else:
         local_folder_path = os.path.join(EXTERNAL_STORAGE_PATH, selected_dir_option)
 
-    st.info(f"当前选择的目录: {local_folder_path}")
+    # st.info(f"当前选择的目录: {local_folder_path}")
+
+    # 将当前选择的目录存储到session_state中
+    if "last_selected_dir" not in st.session_state:
+        st.session_state.last_selected_dir = selected_dir_option
+        st.session_state.dir_changed = True
+    elif st.session_state.last_selected_dir != selected_dir_option:
+        st.session_state.last_selected_dir = selected_dir_option
+        st.session_state.dir_changed = True
+    else:
+        st.session_state.dir_changed = False
 
     if (
         local_folder_path
@@ -433,11 +439,8 @@ def show_file_rename_page():
             # 按中文文件名排序
             files = sorted(files, key=chinese_sort_key)
 
-            st.success(f"在文件夹中找到 {len(files)} 个支持的文件:")
-            st.write(files)
-
             # 预览重命名结果
-            st.subheader("重命名预览")
+            # 即使目录未改变也重新生成预览数据，确保显示最新内容
             renamed_files = rename_files_in_directory(
                 local_folder_path,
                 local_folder_path,  # 使用同一个目录进行预览
@@ -461,7 +464,19 @@ def show_file_rename_page():
                             "状态": status,
                         }
                     )
-                st.table(preview_data)
+
+                # 使用session_state存储预览数据和标题状态，以便后续更新
+                st.session_state.preview_data = preview_data
+                if "rename_title" not in st.session_state:
+                    st.session_state.rename_title = "重命名预览"
+
+                # 创建标题和表格的占位符
+                title_placeholder = st.empty()
+                table_placeholder = st.empty()
+
+                # 显示标题和表格
+                title_placeholder.subheader(st.session_state.rename_title)
+                table_placeholder.table(st.session_state.preview_data)
 
                 # 选择重命名方式
                 st.subheader("重命名操作")
@@ -489,31 +504,29 @@ def show_file_rename_page():
                             )
 
                             if actual_renamed_files:
-                                # 显示重命名结果
-                                result_data = []
+                                # 更新预览数据中的状态
                                 renamed_count = 0
                                 for i, (old_name, new_name) in enumerate(
                                     actual_renamed_files
                                 ):
                                     if old_name != new_name:
                                         renamed_count += 1
-                                        status = "✅ 已重命名"
-                                    else:
-                                        status = "ℹ️ 无需更改"
+                                        # 更新状态为"已重命名"
+                                        st.session_state.preview_data[i][
+                                            "状态"
+                                        ] = "✅ 已重命名"
 
-                                    result_data.append(
-                                        {
-                                            "原始文件名": old_name,
-                                            "新文件名": new_name,
-                                            "状态": status,
-                                        }
-                                    )
+                                # 更新标题为"重命名结果"
+                                st.session_state.rename_title = "重命名结果"
 
                                 st.success(f"成功重命名 {renamed_count} 个文件！")
-                                st.table(result_data)
+                                # 使用相同的占位符更新标题和表格内容
+                                title_placeholder.subheader(
+                                    st.session_state.rename_title
+                                )
+                                table_placeholder.table(st.session_state.preview_data)
 
                                 # 显示重命名后的文件列表
-                                st.subheader("重命名后的文件列表")
                                 new_files = [
                                     f
                                     for f in os.listdir(local_folder_path)
@@ -524,7 +537,6 @@ def show_file_rename_page():
                                     in supported_extensions
                                 ]
                                 new_files = sorted(new_files, key=chinese_sort_key)
-                                st.write(new_files)
                             else:
                                 st.warning("没有找到有效的文件进行重命名。")
 

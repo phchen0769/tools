@@ -4,7 +4,13 @@ import shutil
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
+import time  # 添加time模块导入
 from utils import chinese_sort_key  # 添加utils模块导入
+from st_aggrid import AgGrid, DataReturnMode, GridUpdateMode, GridOptionsBuilder, JsCode
+import zipfile
+import io
+import base64
+
 
 # 外部存储路径（从环境变量获取或使用默认路径）
 EXTERNAL_STORAGE_PATH = os.getenv("EXTERNAL_STORAGE_PATH", "/external_storage")
@@ -21,23 +27,19 @@ def show_file_upload_page():
     # 侧边栏：文件管理选项
     st.sidebar.header("📤 上传文件")
 
-    management_option = st.sidebar.radio(
-        "选择操作", ["上传文件", "查看文件", "删除文件"]
-    )
+    management_option = st.sidebar.radio("选择操作", ["上传文件", "查看文件"])
 
     if management_option == "上传文件":
         show_upload_section()
     elif management_option == "查看文件":
         show_file_list()
-    elif management_option == "删除文件":
-        show_delete_section()
 
 
 def show_file_list():
     """
-    显示文件列表
+    显示文件列表，使用aggrid实现文件查看功能
     """
-    st.header("📋 文件列表")
+    st.subheader("📋 文件列表")
 
     # 获取所有分类
     categories = [
@@ -61,13 +63,16 @@ def show_file_list():
             file_path = os.path.join(category_path, file)
             if os.path.isfile(file_path):
                 file_stat = os.stat(file_path)
+                file_ext = Path(file_path).suffix.lower()
                 files.append(
                     {
                         "文件名": file,
-                        "大小": format_file_size(file_stat.st_size),
+                        "大小": file_stat.st_size,  # 保持原始大小用于排序
+                        "格式化大小": format_file_size(file_stat.st_size),
                         "修改时间": datetime.fromtimestamp(file_stat.st_mtime).strftime(
                             "%Y-%m-%d %H:%M:%S"
                         ),
+                        "分类": selected_category,
                         "路径": file_path,
                     }
                 )
@@ -76,243 +81,192 @@ def show_file_list():
     if files:
         files.sort(key=lambda x: chinese_sort_key(x["文件名"]))
 
-        # 显示文件表格
+        # 转换为DataFrame用于aggrid显示
         df = pd.DataFrame(files)
-        st.dataframe(df, use_container_width=True)
 
-        # 文件预览选项
-        st.subheader("🔍 文件预览")
-        selected_file = st.selectbox("选择文件预览", [f["文件名"] for f in files])
+        # 配置aggrid
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_default_column(editable=False, sortable=True, filterable=True)
 
-        if selected_file:
-            file_path = os.path.join(category_path, selected_file)
-            show_file_preview(file_path)
+        # 配置列
+        gb.configure_column("文件名", width=200)
+        gb.configure_column("大小", hide=True)  # 隐藏原始大小列
+        gb.configure_column("格式化大小", header_name="大小", width=120)
+        gb.configure_column("修改时间", width=200)
+        gb.configure_column("分类", width=100)
+        gb.configure_column("路径", hide=True)  # 隐藏路径列
+
+        # 配置选择
+        gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+
+        # 配置分页
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=30)
+
+        # 构建网格选项
+        grid_options = gb.build()
+
+        # 显示aggrid表格，添加key参数以支持刷新
+        grid_response = AgGrid(
+            df,
+            gridOptions=grid_options,
+            data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+            update_mode=GridUpdateMode.SELECTION_CHANGED,
+            fit_columns_on_grid_load=False,  # 改为False以使用自定义列宽
+            theme="streamlit",
+            height=400,
+            allow_unsafe_jscode=True,
+            key=f"file_grid_{selected_category}_{st.session_state.get('file_list_refresh_key', 0)}",
+        )
+
+        # 将选中的行信息保存到session state中，以便在sidebar中访问
+        selected_rows = grid_response.get("selected_rows", [])
+        st.session_state.selected_rows_for_batch_ops = selected_rows
+
+        # 在侧边栏显示批量操作按钮
+        if selected_rows:
+            with st.sidebar:
+                st.write(f"已选择 {len(selected_rows)} 个文件")
+
+                # 批量下载按钮
+                # 创建ZIP文件
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                    for row in selected_rows:
+                        file_path = row["路径"]
+                        file_name = row["文件名"]
+                        # 将文件添加到ZIP中
+                        zip_file.write(file_path, file_name)
+
+                # 准备下载
+                zip_buffer.seek(0)
+                # 直接提供下载按钮
+                st.download_button(
+                    label="📥 下载选中文件",
+                    data=zip_buffer,
+                    file_name=f"{selected_category}_选中文件.zip",
+                    mime="application/zip",
+                    key="batch_download_sidebar",
+                )
+
+                # 批量删除按钮
+                if st.button("🗑️ 删除选中文件", key="batch_delete_sidebar"):
+                    # 执行批量删除
+                    deleted_count = 0
+                    for row in selected_rows:
+                        file_path = row["路径"]
+                        file_name = row["文件名"]
+                        try:
+                            os.remove(file_path)
+                            deleted_count += 1
+                        except Exception as e:
+                            st.error(f"❌ 删除失败 {file_name}: {e}")
+
+                    if deleted_count > 0:
+                        st.success(f"🎉 成功删除 {deleted_count} 个文件！")
+                        # 更新刷新键以强制重新加载表格
+                        if "file_list_refresh_key" not in st.session_state:
+                            st.session_state.file_list_refresh_key = 0
+                        st.session_state.file_list_refresh_key += 1
+                        # 短暂延迟确保消息显示，然后重新加载页面
+                        time.sleep(1)
+                        st.experimental_rerun()
+                    else:
+                        # 即使没有删除成功，也更新刷新键以清除选择状态
+                        if "file_list_refresh_key" not in st.session_state:
+                            st.session_state.file_list_refresh_key = 0
+                        st.session_state.file_list_refresh_key += 1
     else:
         st.info(f"'{selected_category}' 分类中暂无文件。")
 
 
-def show_delete_section():
+def format_file_size(size_bytes):
     """
-    显示文件删除部分
+    格式化文件大小显示
     """
-    st.header("🗑️ 删除文件")
+    if size_bytes == 0:
+        return "0 B"
+    size_names = ["B", "KB", "MB", "GB", "TB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    return f"{size_bytes:.1f} {size_names[i]}"
 
-    # 获取所有分类
-    categories = [
-        d
-        for d in os.listdir(EXTERNAL_STORAGE_PATH)
-        if os.path.isdir(os.path.join(EXTERNAL_STORAGE_PATH, d))
-    ]
 
-    if not categories:
-        st.info("暂无文件可删除。")
-        return
-
-    # 选择分类
-    selected_category = st.selectbox("选择分类", categories)
-    category_path = os.path.join(EXTERNAL_STORAGE_PATH, selected_category)
-
-    # 获取文件列表
-    files = []
-    if os.path.exists(category_path):
-        files = [
-            f
-            for f in os.listdir(category_path)
-            if os.path.isfile(os.path.join(category_path, f))
-        ]
-
-    # 使用chinese_sort_key对文件列表进行排序
-    if files:
-        files.sort(key=chinese_sort_key)
-
-        # 选择要删除的文件
-        files_to_delete = st.multiselect("选择要删除的文件", files)
-
-        if files_to_delete:
-            st.warning("⚠️ 即将删除以下文件（此操作不可恢复）：")
-            for file in files_to_delete:
-                st.write(f"- {file}")
-
-            # 确认删除
-            if st.button("确认删除", type="secondary"):
-                deleted_count = 0
-                for file in files_to_delete:
-                    file_path = os.path.join(category_path, file)
-                    try:
-                        os.remove(file_path)
-                        deleted_count += 1
-                        st.success(f"✅ 已删除: {file}")
-                    except Exception as e:
-                        st.error(f"❌ 删除失败 {file}: {e}")
-
-                if deleted_count > 0:
-                    st.success(f"🎉 成功删除 {deleted_count} 个文件！")
-    else:
-        st.info(f"'{selected_category}' 分类中暂无文件。")
+def get_mime_type(file_extension):
+    """
+    根据文件扩展名返回MIME类型
+    """
+    mime_types = {
+        ".txt": "text/plain",
+        ".pdf": "application/pdf",
+        ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".xls": "application/vnd.ms-excel",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".csv": "text/csv",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".bmp": "image/bmp",
+    }
+    return mime_types.get(file_extension.lower(), "application/octet-stream")
 
 
 def show_upload_section():
     """
     显示文件上传部分
     """
+    st.subheader("📤 上传文件")
 
-    # 创建分类目录
-    categories = ["文档", "图片", "Excel文件", "其他"]
-    selected_category = st.selectbox("选择文件分类", categories)
+    # 获取现有分类
+    categories = [
+        d
+        for d in os.listdir(EXTERNAL_STORAGE_PATH)
+        if os.path.isdir(os.path.join(EXTERNAL_STORAGE_PATH, d))
+    ]
 
-    # 根据分类创建目录
-    category_path = os.path.join(EXTERNAL_STORAGE_PATH, selected_category)
-    os.makedirs(category_path, exist_ok=True)
-
-    # 文件上传区域
-    uploaded_files = st.file_uploader(
-        f"选择要上传到 '{selected_category}' 分类的文件",
-        type=[
-            "pdf",
-            "doc",
-            "docx",
-            "txt",
-            "xlsx",
-            "xls",
-            "csv",
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "bmp",
-            "zip",
-            "rar",
-        ],
-        accept_multiple_files=True,
-        help="支持多文件上传，最大文件大小：200MB",
-    )
-
-    if uploaded_files:
-        # 显示上传进度
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-        for i, uploaded_file in enumerate(uploaded_files):
-            # 更新进度
-            progress = (i + 1) / len(uploaded_files)
-            progress_bar.progress(progress)
-            status_text.text(
-                f"正在上传 {i+1}/{len(uploaded_files)}: {uploaded_file.name}"
-            )
-
-            # 保存文件
-            file_path = os.path.join(category_path, uploaded_file.name)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-
-            # 记录上传信息
-            log_upload_info(uploaded_file.name, selected_category, file_path)
-
-        # 完成上传
-        progress_bar.empty()
-        status_text.empty()
-        st.success(
-            f"✅ 成功上传 {len(uploaded_files)} 个文件到 '{selected_category}' 分类！"
-        )
-
-        # 显示上传统计
-        show_upload_stats()
-
-
-def format_file_size(size_bytes):
-    """
-    格式化文件大小
-    """
-    if size_bytes == 0:
-        return "0 B"
-    size_names = ["B", "KB", "MB", "GB"]
-    i = 0
-    while size_bytes >= 1024 and i < len(size_names) - 1:
-        size_bytes /= 1024.0
-        i += 1
-    return f"{size_bytes:.2f} {size_names[i]}"
-
-
-def log_upload_info(filename, category, file_path):
-    """
-    记录上传信息（可扩展为数据库记录）
-    """
-    # 这里可以扩展为将上传记录保存到数据库
-    upload_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.sidebar.info(f"📝 上传记录: {filename} → {category} ({upload_time})")
-
-
-def show_upload_stats():
-    """
-    显示上传统计信息
-    """
-    st.subheader("📊 存储统计")
-
-    total_size = 0
-    file_count = 0
-
-    # 计算总文件大小和数量
-    for category in os.listdir(EXTERNAL_STORAGE_PATH):
-        category_path = os.path.join(EXTERNAL_STORAGE_PATH, category)
-        if os.path.isdir(category_path):
-            for file in os.listdir(category_path):
-                file_path = os.path.join(category_path, file)
-                if os.path.isfile(file_path):
-                    total_size += os.path.getsize(file_path)
-                    file_count += 1
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("文件总数", file_count)
-    with col2:
-        st.metric("总存储大小", format_file_size(total_size))
-    with col3:
-        st.metric(
-            "分类数量",
-            len(
-                [
-                    d
-                    for d in os.listdir(EXTERNAL_STORAGE_PATH)
-                    if os.path.isdir(os.path.join(EXTERNAL_STORAGE_PATH, d))
-                ]
-            ),
-        )
-
-
-def show_file_preview(file_path):
-    """
-    显示文件预览（根据文件类型）
-    """
-    file_ext = Path(file_path).suffix.lower()
-
-    if file_ext in [".txt", ".py", ".csv"]:
-        # 文本文件预览
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            st.text_area("文件内容", content, height=200)
-        except:
-            st.warning("无法预览此文件内容")
-
-    elif file_ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp"]:
-        # 图片预览
-        st.image(file_path, use_column_width=True)
-
-    elif file_ext in [".xlsx", ".xls"]:
-        # Excel文件预览
-        try:
-            df = pd.read_excel(file_path)
-            st.dataframe(df.head(10), use_container_width=True)
-        except:
-            st.warning("无法预览Excel文件")
-
-    elif file_ext == ".pdf":
-        # PDF文件预览（需要扩展）
-        st.info("PDF文件预览功能需要额外配置")
-
+    # 选择或创建分类
+    if categories:
+        category_option = st.radio("选择操作", ["选择现有分类", "创建新分类"])
+        if category_option == "选择现有分类":
+            selected_category = st.selectbox("选择分类", categories)
+        else:
+            new_category = st.text_input("输入新分类名称")
+            selected_category = new_category if new_category else None
     else:
-        st.info("暂不支持此文件类型的预览")
+        st.info("暂无现有分类，请创建新分类。")
+        new_category = st.text_input("输入新分类名称")
+        selected_category = new_category if new_category else None
 
+    if selected_category:
+        category_path = os.path.join(EXTERNAL_STORAGE_PATH, selected_category)
+        os.makedirs(category_path, exist_ok=True)
 
-if __name__ == "__main__":
-    show_file_upload_page()
+        # 文件上传
+        uploaded_files = st.file_uploader(
+            "选择文件上传", accept_multiple_files=True, key="file_uploader"
+        )
+
+        if uploaded_files:
+            success_count = 0
+            for uploaded_file in uploaded_files:
+                try:
+                    # 保存文件
+                    file_path = os.path.join(category_path, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    success_count += 1
+                except Exception as e:
+                    st.error(f"❌ 上传失败 {uploaded_file.name}: {e}")
+
+            if success_count > 0:
+                st.success(f"🎉 成功上传 {success_count} 个文件！")
+                # 更新刷新键以强制重新加载表格
+                if "file_list_refresh_key" not in st.session_state:
+                    st.session_state.file_list_refresh_key = 0
+                st.session_state.file_list_refresh_key += 1
+                # 短暂延迟确保消息显示，然后重新加载页面
+                time.sleep(1)
+                st.experimental_rerun()

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import glob
+import tempfile
 
 from aggrid import aggrid_question
 from db_operator import (
@@ -21,6 +22,12 @@ def show_file_import_section():
         st.session_state.show_success_message = False
     if "error_messages" not in st.session_state:
         st.session_state.error_messages = []
+    # 添加本地文件处理状态跟踪
+    if "processed_local_files" not in st.session_state:
+        st.session_state.processed_local_files = set()
+    # 添加file_uploader的key状态跟踪
+    if "local_file_uploader_key" not in st.session_state:
+        st.session_state.local_file_uploader_key = 0
 
     # 侧边栏 - 文件导入功能（移除了模板下载和查看命名示例）
     with st.sidebar:
@@ -65,6 +72,8 @@ def show_file_import_section():
 
             with col2:
                 if st.button("🔄 刷新文件列表"):
+                    # 清理processed_files状态以避免死循环
+                    st.session_state.processed_files = set()
                     st.experimental_rerun()
 
             # 显示文件列表供用户选择
@@ -179,6 +188,100 @@ def show_file_import_section():
             **💡 注意：** 这是外部存储路径，通过docker-compose.yml挂载到容器
             """
             )
+
+        # 添加本地文件上传功能
+        st.subheader("💻 本地文件上传")
+        st.info("您可以直接上传Excel文件进行导入")
+
+        # 使用st.file_uploader允许用户上传多个Excel文件
+        uploaded_files = st.file_uploader(
+            "选择Excel文件上传",
+            type=["xlsx"],
+            accept_multiple_files=True,
+            key=f"local_file_uploader_{st.session_state.local_file_uploader_key}",
+        )
+
+        # 处理上传的文件
+        if uploaded_files:
+            local_files_processed = False
+            local_error_messages = []
+
+            for uploaded_file in uploaded_files:
+                try:
+                    # 获取上传的文件名
+                    file_name = uploaded_file.name
+
+                    # 检查文件是否已经处理过
+                    if file_name in st.session_state.processed_local_files:
+                        continue
+
+                    # 根据文件名，获取班别名和创建者
+                    try:
+                        class_name = file_name.split(".")[0].split("_")[-2]
+                        creator = file_name.split(".")[0].split("_")[-1]
+                    except IndexError:
+                        local_error_messages.append(
+                            f"文件 '{file_name}' 命名格式不正确，请按照'班别_姓名.xlsx'格式命名"
+                        )
+                        continue
+
+                    # 创建临时文件来保存上传的文件内容
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".xlsx", delete=False
+                    ) as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        tmp_file_path = tmp_file.name
+
+                    # 读取上传的Excel文件
+                    try:
+                        df = read_xlsx(tmp_file_path)
+                    except Exception as e:
+                        local_error_messages.append(
+                            f"文件 '{file_name}' 读取失败：{str(e)}"
+                        )
+                        # 清理临时文件
+                        os.unlink(tmp_file_path)
+                        continue
+
+                    # 数据导入数据库
+                    success, message = to_sql_questions(df, creator, class_name)
+
+                    # 清理临时文件
+                    os.unlink(tmp_file_path)
+
+                    if success:
+                        # 标记文件为已处理
+                        st.session_state.processed_local_files.add(file_name)
+                        local_files_processed = True
+                        st.success(f"✅ 成功导入: {file_name}")
+
+                        # 如果是admin文件，给出特殊提示
+                        if "admin" in file_name.lower():
+                            st.info("🚨 注意：已导入标准答案文件")
+                    else:
+                        local_error_messages.append(
+                            f"文件 '{file_name}' 导入失败：{message}"
+                        )
+
+                except Exception as e:
+                    local_error_messages.append(
+                        f"文件 '{uploaded_file.name}' 处理时发生未知错误：{str(e)}"
+                    )
+
+            # 显示本地文件上传的错误消息
+            if local_error_messages:
+                for error_msg in local_error_messages:
+                    st.error(error_msg)
+
+            # 显示本地文件上传状态
+            if local_files_processed:
+                st.success("🎉 上传的文件已成功导入！")
+                # 重置file_uploader状态
+                st.session_state.local_file_uploader_key += 1
+                # 清理已处理文件记录
+                st.session_state.processed_local_files = set()
+                # 重新加载页面以反映更改
+                st.experimental_rerun()
 
 
 # 显示content内容

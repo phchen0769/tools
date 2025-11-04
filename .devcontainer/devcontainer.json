@@ -1,7 +1,9 @@
 {
 	"name": "tools",
-	"dockerComposeFile": "../docker-compose.yml",
-	"service": "streamlit",
+	"build": {
+		"dockerfile": "../Dockerfile",
+		"context": ".."
+	},
 	"workspaceFolder": "/workspaces/tools",
 	// 自定义配置
 	"customizations": {
@@ -22,12 +24,21 @@
 	},
 	// 端口转发配置
 	"forwardPorts": [
-		8888
+		5555
 	],
 	// 容器创建后执行的命令
 	"postCreateCommand": "pip3 install --upgrade pip && pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 install -r requirements.txt",
 	// 远程用户配置
 	"remoteUser": "vscode",
-	// 开发容器配置
-	"shutdownAction": "stopCompose"
+	// 挂载卷配置
+	"mounts": [
+		"source=/Volumes/myDriver/Docker/Streamlit,target=/external_storage,type=bind"
+	],
+	// 环境变量配置
+	"containerEnv": {
+		"PYTHONPATH": "/workspaces/tools",
+		"STREAMLIT_SERVER_PORT": "5555",
+		"STREAMLIT_SERVER_ADDRESS": "0.0.0.0",
+		"EXTERNAL_STORAGE_PATH": "/external_storage"
+	}
 }
