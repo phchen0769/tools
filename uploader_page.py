@@ -267,6 +267,8 @@ def show_upload_section():
                 if "file_list_refresh_key" not in st.session_state:
                     st.session_state.file_list_refresh_key = 0
                 st.session_state.file_list_refresh_key += 1
-                # 短暂延迟确保消息显示，然后重新加载页面
+                # 移除 st.experimental_rerun() 避免页面刷新
+                # 短暂延迟确保消息显示
                 time.sleep(1)
-                st.experimental_rerun()
+                # 使用 st.session_state 标记上传成功状态
+                st.session_state.upload_success = True
