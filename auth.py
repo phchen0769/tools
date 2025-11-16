@@ -96,7 +96,7 @@ if st.session_state["authentication_status"]:
 
     with col3:
         # 退出登录按钮
-        if st.button("🚪 退出登录"):
+        if st.button("退出登录"):
             st.session_state["authentication_status"] = None
             st.rerun()
 

@@ -89,7 +89,7 @@ def show_file_list():
         gb.configure_default_column(editable=False, sortable=True, filterable=True)
 
         # 配置列
-        gb.configure_column("文件名", width=200)
+        gb.configure_column("文件名", width=400)
         gb.configure_column("大小", hide=True)  # 隐藏原始大小列
         gb.configure_column("格式化大小", header_name="大小", width=120)
         gb.configure_column("修改时间", width=200)
