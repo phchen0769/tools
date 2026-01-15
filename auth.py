@@ -6,6 +6,7 @@ from questions_page import main as frist_main
 from records_page import main as second_main
 from renamer_page import show_file_rename_page  # 添加这一行
 from uploader_page import show_file_upload_page  # 添加文件上传页面导入
+from homevisit_page import show_home_visit_page  # 确保导入正确的函数名
 from db_operator import out_sql
 
 
@@ -114,6 +115,11 @@ if st.session_state["authentication_status"]:
     @app.addapp()
     def 文件重命名():
         show_file_rename_page()
+
+    # 添加家访表功能
+    @app.addapp()
+    def 家访表():
+        show_home_visit_page()
 
     @app.addapp()
     def 题目详情():

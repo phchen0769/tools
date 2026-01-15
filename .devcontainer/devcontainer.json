@@ -12,7 +12,8 @@
 				"ms-python.python",
 				"ms-python.vscode-pylance",
 				"ms-python.black-formatter",
-				"MarsCode.marscode-extension"
+				"MarsCode.marscode-extension",
+				"Alibaba-Cloud.tongyi-lingma"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
