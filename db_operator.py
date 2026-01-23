@@ -136,9 +136,12 @@ def to_sql_questions(xls_df, creator, class_name):
                     if student_obj:  # 只有存在学生对象时才累加分数
                         # 修复：将score转换为字符串后再检查是否为数字
                         score_str = str(score)
-                        student_obj.score += (
-                            int(score_str) if score_str.isdigit() else 0
-                        )
+                        # 修改为更通用的数值转换方式，可以处理整数和浮点数
+                        try:
+                            student_obj.score += float(score_str)
+                        except ValueError:
+                            # 如果无法转换为浮点数，则按0分处理
+                            student_obj.score += 0.0
 
             score = str(score)
 
