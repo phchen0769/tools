@@ -1,9 +1,10 @@
 import pandas as pd
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit as st
+import secrets
 
 from file_operator import *
 from utils import normalize_command
@@ -23,7 +24,7 @@ def get_engine():
         # 使用连接池，设置echo=False减少日志输出
         _engine = create_engine(
             "sqlite:///myDB.db",
-            echo=True,  # 关闭详细日志
+            echo=False,  # 关闭详细日志
             pool_size=5,  # 连接池大小
             max_overflow=10,  # 最大溢出连接数
             pool_pre_ping=True,  # 连接前检查
@@ -38,6 +39,20 @@ def get_session():
     if _session_factory is None:
         _session_factory = sessionmaker(bind=get_engine())
     return scoped_session(_session_factory)
+
+
+# 定义Session的ORM映射
+class Session(Base):
+    # 指定本类映射到sessions表
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_token = Column(String(255), unique=True, nullable=False, index=True)
+    username = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False)
+    email = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
 
 
 # 定义Question的ORM映射
@@ -64,6 +79,83 @@ class Student(Base):
     name = Column(String(100))
     class_name = Column(String(16))
     score = Column(Integer)
+
+
+# 创建所有表
+def init_db():
+    """初始化数据库，创建所有未创建的表"""
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+
+def create_session(username, name, email, expiry_hours=24):
+    """创建一个新的session记录"""
+    session_token = secrets.token_urlsafe(32)  # 生成安全的随机token
+    expires_at = datetime.utcnow().replace(microsecond=0) + timedelta(hours=expiry_hours)
+    
+    session = get_session()
+    try:
+        session_record = Session(
+            session_token=session_token,
+            username=username,
+            name=name,
+            email=email,
+            created_at=datetime.utcnow().replace(microsecond=0),
+            expires_at=expires_at
+        )
+        session.add(session_record)
+        session.commit()
+        return session_token
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+
+def get_session_by_token(token):
+    """根据session token获取用户信息"""
+    session = get_session()
+    try:
+        session_record = session.query(Session).filter(
+            Session.session_token == token,
+            Session.expires_at > datetime.utcnow()
+        ).first()
+        
+        return session_record
+    finally:
+        session.close()
+
+
+def delete_session(token):
+    """删除指定的session记录"""
+    session = get_session()
+    try:
+        session_record = session.query(Session).filter(Session.session_token == token).first()
+        if session_record:
+            session.delete(session_record)
+            session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+
+def cleanup_expired_sessions():
+    """清理过期的session记录"""
+    session = get_session()
+    try:
+        expired_count = session.query(Session).filter(
+            Session.expires_at <= datetime.utcnow()
+        ).delete()
+        session.commit()
+        return expired_count
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
 
 
 # excel导入数据库表questions
